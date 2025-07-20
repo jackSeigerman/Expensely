@@ -49,5 +49,3 @@ npx expo export --platform web
 ```bash
 Eas deploy
 ```
-
-hi
