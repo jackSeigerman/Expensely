@@ -1,13 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, TextInput } from 'react-native';
-import { DatabaseManager, TransactionService, WalletService, CategoryService, Transaction, Wallet, ExpenseCategory, IncomeCategory } from '../database';
+import { DatabaseManager, TransactionService, WalletService, Transaction, Wallet } from '../database';
 
 export default function App() {
     const [dbInitialized, setDbInitialized] = useState(false);
     const [transactions, setTransactions] = useState<Transaction[]>([]);
     const [wallets, setWallets] = useState<Wallet[]>([]);
-    const [expenseCategories, setExpenseCategories] = useState<ExpenseCategory[]>([]);
-    const [incomeCategories, setIncomeCategories] = useState<IncomeCategory[]>([]);
     const [loading, setLoading] = useState(false);
     
     const [walletName, setWalletName] = useState('');
@@ -15,8 +13,7 @@ export default function App() {
     
     const [selectedWalletId, setSelectedWalletId] = useState('');
     const [transactionAmount, setTransactionAmount] = useState('');
-    const [transactionType, setTransactionType] = useState<'expense' | 'income'>('expense');
-    const [selectedCategory, setSelectedCategory] = useState('');
+    const [transactionCategory, setTransactionCategory] = useState('');
     const [transactionDescription, setTransactionDescription] = useState('');
 
     useEffect(() => {
@@ -30,7 +27,6 @@ export default function App() {
             setDbInitialized(true);
             await loadTransactions();
             await loadWallets();
-            await loadCategories();
         } catch (error) {
             console.error('Failed to initialize app:', error);
             Alert.alert('Error', 'Failed to initialize database');
@@ -54,17 +50,6 @@ export default function App() {
             setWallets(allWallets);
         } catch (error) {
             console.error('Failed to load wallets:', error);
-        }
-    };
-
-    const loadCategories = async () => {
-        try {
-            const expenseCategories = await CategoryService.getAllExpenseCategories();
-            const incomeCategories = await CategoryService.getAllIncomeCategories();
-            setExpenseCategories(expenseCategories);
-            setIncomeCategories(incomeCategories);
-        } catch (error) {
-            console.error('Failed to load categories:', error);
         }
     };
 
@@ -95,7 +80,7 @@ export default function App() {
 
     const addTransaction = async () => {
         try {
-            if (!selectedWalletId || !transactionAmount.trim() || !selectedCategory.trim()) {
+            if (!selectedWalletId || !transactionAmount.trim() || !transactionCategory.trim()) {
                 Alert.alert('Error', 'Please fill in all required transaction fields');
                 return;
             }
@@ -106,13 +91,10 @@ export default function App() {
                 return;
             }
 
-            // For income transactions, make amount positive; for expenses, make it negative
-            const finalAmount = transactionType === 'income' ? Math.abs(amount) : -Math.abs(amount);
-
             const newTransaction = {
                 WID: parseInt(selectedWalletId),
-                amount: finalAmount,
-                category: selectedCategory.trim(),
+                amount: amount,
+                category: transactionCategory.trim(),
                 description: transactionDescription.trim() || '',
                 date: new Date().toISOString()
             };
@@ -122,7 +104,7 @@ export default function App() {
             
             setSelectedWalletId('');
             setTransactionAmount('');
-            setSelectedCategory('');
+            setTransactionCategory('');
             setTransactionDescription('');
             
             Alert.alert('Success', 'Transaction added successfully!');
@@ -220,71 +202,12 @@ export default function App() {
                     onChangeText={setTransactionAmount}
                     keyboardType="numeric"
                 />
-                
-                <View style={styles.pickerContainer}>
-                    <Text style={styles.pickerLabel}>Transaction Type:</Text>
-                    <View style={styles.typeContainer}>
-                        <TouchableOpacity
-                            style={[
-                                styles.typeOption,
-                                transactionType === 'expense' && styles.selectedTypeOption
-                            ]}
-                            onPress={() => {
-                                setTransactionType('expense');
-                                setSelectedCategory('');
-                            }}
-                        >
-                            <Text style={[
-                                styles.typeOptionText,
-                                transactionType === 'expense' && styles.selectedTypeOptionText
-                            ]}>
-                                Expense
-                            </Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                            style={[
-                                styles.typeOption,
-                                transactionType === 'income' && styles.selectedTypeOption
-                            ]}
-                            onPress={() => {
-                                setTransactionType('income');
-                                setSelectedCategory('');
-                            }}
-                        >
-                            <Text style={[
-                                styles.typeOptionText,
-                                transactionType === 'income' && styles.selectedTypeOptionText
-                            ]}>
-                                Income
-                            </Text>
-                        </TouchableOpacity>
-                    </View>
-                </View>
-
-                <View style={styles.pickerContainer}>
-                    <Text style={styles.pickerLabel}>
-                        Select {transactionType === 'expense' ? 'Expense' : 'Income'} Category:
-                    </Text>
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoryPicker}>
-                        {(transactionType === 'expense' ? expenseCategories : incomeCategories).map((category, index) => (
-                            <TouchableOpacity
-                                key={`${transactionType}-${index}`}
-                                style={[
-                                    styles.categoryOption,
-                                    selectedCategory === category.name && styles.selectedCategoryOption
-                                ]}
-                                onPress={() => setSelectedCategory(category.name)}
-                            >
-                                <Text style={[
-                                    styles.categoryOptionText,
-                                    selectedCategory === category.name && styles.selectedCategoryOptionText
-                                ]}>
-                                    {category.name}
-                                </Text>
-                            </TouchableOpacity>
-                        ))}
-                    </ScrollView>
-                </View>
+                <TextInput
+                    style={styles.input}
+                    placeholder="Category (e.g., Food, Transport)"
+                    value={transactionCategory}
+                    onChangeText={setTransactionCategory}
+                />
                 <TextInput
                     style={styles.input}
                     placeholder="Description (optional)"
@@ -301,7 +224,7 @@ export default function App() {
             </View>
             
             <View style={styles.buttonContainer}>
-                <TouchableOpacity style={styles.button} onPress={() => { loadTransactions(); loadWallets(); loadCategories(); }}>
+                <TouchableOpacity style={styles.button} onPress={() => { loadTransactions(); loadWallets(); }}>
                     <Text style={styles.buttonText}>Refresh Data</Text>
                 </TouchableOpacity>
                 
@@ -432,57 +355,6 @@ const styles = StyleSheet.create({
         color: '#333',
     },
     selectedWalletOptionText: {
-        color: '#fff',
-    },
-    typeContainer: {
-        flexDirection: 'row',
-        gap: 10,
-        marginBottom: 10,
-    },
-    typeOption: {
-        backgroundColor: '#e9ecef',
-        padding: 10,
-        borderRadius: 8,
-        flex: 1,
-        alignItems: 'center',
-        borderWidth: 1,
-        borderColor: '#ddd',
-    },
-    selectedTypeOption: {
-        backgroundColor: '#28a745',
-        borderColor: '#28a745',
-    },
-    typeOptionText: {
-        fontSize: 14,
-        color: '#333',
-        fontWeight: '500',
-    },
-    selectedTypeOptionText: {
-        color: '#fff',
-    },
-    categoryPicker: {
-        marginBottom: 10,
-    },
-    categoryOption: {
-        backgroundColor: '#e9ecef',
-        padding: 8,
-        borderRadius: 6,
-        marginRight: 8,
-        borderWidth: 1,
-        borderColor: '#ddd',
-        minWidth: 80,
-        alignItems: 'center',
-    },
-    selectedCategoryOption: {
-        backgroundColor: '#17a2b8',
-        borderColor: '#17a2b8',
-    },
-    categoryOptionText: {
-        fontSize: 12,
-        color: '#333',
-        textAlign: 'center',
-    },
-    selectedCategoryOptionText: {
         color: '#fff',
     },
     buttonContainer: {
